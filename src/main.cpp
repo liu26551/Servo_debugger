@@ -1,8 +1,16 @@
 /*
  * @Author: LIUXY 2816184983@qq.com
+ * @Date: 2024-06-05 14:41:36
+ * @LastEditors: LIUXY 2816184983@qq.com
+ * @LastEditTime: 2024-11-10 12:50:10
+ * @FilePath: \Esp32_air_filtere:\PlatformIO\Projects\Servo_debugger\src\main.cpp
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
+/*
+ * @Author: LIUXY 2816184983@qq.com
  * @Date: 2024-06-02 22:07:56
  * @LastEditors: LIUXY 2816184983@qq.com
- * @LastEditTime: 2024-06-23 10:05:18
+ * @LastEditTime: 2024-09-30 14:58:43
  * @FilePath: \micro_ros2_espteste:\PlatformIO\Projects\Servo_controller\src\main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -93,7 +101,9 @@
 static int menuState = MAIN_MENU;
 static int MidState = PWM_MENU;
 static int ActionState = 0;
+const float beta = 0.25;
 static int angle = 0;
+static int previous_angle = 0;
 static int id = 1;
 static uint8_t setID = 1;
 
@@ -190,7 +200,7 @@ void setup()
   // 显示图案
   // Clear the buffer
   // Clear the buffer
-  for (int i = 150; i < (LOGO_NUM - 500); i++)
+  for (int i = 100; i < (LOGO_NUM - 500); i++)
   {
     display.display();      // 显示当前的图像
     display.clearDisplay(); // 清空屏幕
@@ -335,18 +345,18 @@ void displayMenu()
     break;
   }
 
-  // 画线框,显示接线顺序  — + S
+  // 画线框,显示接线顺序  S + -
   int boxX = 116;     // 线框左上角X坐标
   int boxY = 24;      // 线框左上角Y坐标
   int boxWidth = 10;  // 线框宽度
   int boxHeight = 34; // 线框高度
   display.drawRect(boxX, boxY, boxWidth, boxHeight, SSD1306_WHITE);
   display.setCursor(boxX + 2, boxY + 2);  // 设置文本开始位置
-  display.println("-");                   // 打印文本
+  display.println("S");                   // 打印文本
   display.setCursor(boxX + 2, boxY + 12); // 设置文本开始位置
   display.println("+");                   // 打印文本
   display.setCursor(boxX + 2, boxY + 22); // 设置文本开始位置
-  display.println("S");                   // 打印文本
+  display.println("-");                   // 打印文本
 
   display.display();
 }
@@ -374,10 +384,12 @@ void checkButtonPress()
     case PWM_MENU:
       currentSelection = (currentSelection + 1) % PWM_menuItemCount;
       MidState = pwmmenu[currentSelection];
+      previous_angle = previous_angle = map(analogRead(ADC_P), 800, 3600, 500, 2500);
       break;
     case BUS_MENU:
       currentSelection = (currentSelection + 1) % BUS_menuItemCount;
       MidState = busmenu[currentSelection];
+      previous_angle = previous_angle = map(analogRead(ADC_P), 800, 3600, 500, 2500);
       break;
     default:
       break;
@@ -404,10 +416,13 @@ void checkButtonPress()
     case PWM_MENU:
       currentSelection = (currentSelection - 1 + PWM_menuItemCount) % PWM_menuItemCount;
       MidState = pwmmenu[currentSelection];
+      previous_angle = map(analogRead(ADC_P), 800, 3600, 500, 2500);
       break;
     case BUS_MENU:
       currentSelection = (currentSelection - 1 + BUS_menuItemCount) % BUS_menuItemCount;
       MidState = busmenu[currentSelection];
+      previous_angle = map(analogRead(ADC_P), 800, 3600, 0, 1000);
+
     default:
       break;
     }
@@ -508,26 +523,34 @@ void ServoContorl()
   {
     // PWM模式一键居中
   case PWM_SET_CENTER:
-    servo1.writeMicroseconds(1500);
-
+    angle = 1500;
+    servo1.writeMicroseconds(angle);
+    servo2.writeMicroseconds(angle);
     break;
     // PWM模式角度控制
   case PWM_CONTROL_ANGLE:
-    angle = map(analogRead(ADC_P), 0, 4095, 500, 2500);
+
+    angle = map(analogRead(ADC_P), 800, 3600, 500, 2500);
+    angle = int(beta * angle + (1 - beta) * previous_angle);
+    previous_angle = angle;
+    // 限制angle范围
+    angle = constrain(angle, 500, 2500);
+    Serial.println(angle);
     servo1.writeMicroseconds(angle);
     servo2.writeMicroseconds(angle);
-
     break;
     // 总线模式 ID设置
   case BUS_SET_ID:
     // 总线舵机模式
-    // BusServo.SetID(254, setID);
+    BusServo.SetID(254, setID);
     break;
     // 总线模式运动控制
   case BUS_CONTROL_MOVE:
-    angle = map(analogRead(ADC_P), 0, 4095, 0, 1000);
+    angle = map(analogRead(ADC_P), 800, 3600, 0, 1000);
     // 限定angle的值在0-1000之间
-
+    angle = int(beta * angle + (1 - beta) * previous_angle);
+    previous_angle = angle;
+    angle = constrain(angle, 0, 1000);
     BusServo.Move(254, angle, 15);
     break;
   // 总线模式一键居中

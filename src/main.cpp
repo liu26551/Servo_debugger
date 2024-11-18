@@ -190,7 +190,7 @@ void setup()
   // 显示图案
   // Clear the buffer
   // Clear the buffer
-  for (int i = 150; i < (LOGO_NUM - 450); i++)
+  for (int i = 150; i < (LOGO_NUM - 500); i++)
   {
     display.display();      // 显示当前的图像
     display.clearDisplay(); // 清空屏幕
